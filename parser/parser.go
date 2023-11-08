@@ -46,7 +46,7 @@ type Parser struct {
 }
 
 //Parser method
-func makeNewParser(lexer *lexer.Lexer) *Parser {
+func MakeNewParser(lexer *lexer.Lexer) *Parser {
 	newParser := &Parser{lexer: lexer}
 	newParser.nextToken()
 	newParser.nextToken()
@@ -117,8 +117,8 @@ func (p *Parser) makeLetStatement() *ast.LetStatement {
 	if !p.checkNextToken(token.ASSIGN) {
 		return nil
 	}
-
 	p.nextToken()
+	
 	statement.Value = p.makeExpression(LOWEST)
 
 	if p.peekToken.Type == token.SEMICOLON {
@@ -129,10 +129,9 @@ func (p *Parser) makeLetStatement() *ast.LetStatement {
 
 func (p *Parser) makeReturnStatement() *ast.ReturnStatement {
 	statement := &ast.ReturnStatement{Token: p.curToken}
-
 	p.nextToken()
-
-	for p.curToken.Type != token.SEMICOLON {
+	statement.ReturnValue = p.makeExpression(LOWEST)
+	if p.curToken.Type == token.SEMICOLON {
 		p.nextToken()
 	}
 	return statement
@@ -312,7 +311,7 @@ func (p *Parser) makeStatement() ast.Statement {
 	return statement
 }
 
-func (p *Parser) parseProgram() *ast.Program {
+func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
 
