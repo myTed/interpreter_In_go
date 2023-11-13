@@ -23,10 +23,38 @@ func isError(obj object.Object) bool{
 	return false
 }
 
+func applyFunction(ce *ast.CallExpression, env *object.Environment) object.Object{
+	function, ok := Eval(ce.Function, env).(*object.Function)
+	if isError(function) {
+		return function
+	}
+	if !ok {
+		return newError("not a function: %s", function.Type())
+	}
+	newEnv := object.NewEnvironment(function.Env)
+	for idx, arg := range ce.Arguments {
+		val := Eval(arg, env)
+		if isError(val) {
+			return val
+		}
+		newEnv.Set(function.Parameters[idx].String(), val)
+	}
+	evaluated := Eval(function.Body, newEnv)
+	if returnValue, ok := evaluated.(*object.ReturnValue); ok {
+		return returnValue.Value
+	}
+	return evaluated
+}
+
 func Eval(node ast.Node, env *object.Environment) object.Object{
 	switch node := node.(type) {
 	case *ast.Program:
 		return evalProgram(node.Statements, env)
+	case *ast.FunctionLiteral:
+		return &object.Function{Parameters: node.Parameters,
+		Body: node.Body, Env: env}
+	case *ast.CallExpression:
+		return applyFunction(node, env)		
 	case *ast.LetStatement:
 		val := Eval(node.Value, env)
 		if isError(val) {
