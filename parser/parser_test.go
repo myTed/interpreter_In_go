@@ -267,6 +267,28 @@ func testPrefixExpression(t *testing.T, exp ast.Expression,
 }
 
 
+func TestParsingArrayLiterals(t *testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+
+	l := lexer.New(input)
+	parser := MakeNewParser(l)
+	program := parser.ParseProgram()
+	checkParserErrors(t, parser)
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	array, ok := stmt.Expression.(*ast.ArrayLiteral)
+	if !ok {
+		t.Fatalf("exp not ast.ArrayLiteral. got=%T", stmt.Expression)
+	}
+	if len(array.Elements) != 3 {
+		t.Fatalf("len(array.Elements) not 3. got=%d", len(array.Elements))
+	}
+	testIntegerLiteral(t, array.Elements[0], 1)
+	testInfixExpression(t, array.Elements[1], 2, "*", 2)
+	testInfixExpression(t, array.Elements[2], 3, "+", 3)
+
+}
+
 func TestFunctionParameterParsing(t *testing.T) {
 	tests := []struct {
 		input 			string
@@ -642,7 +664,6 @@ func TestReturnStatement(t *testing.T) {
 	}
 }
 
-
 func TestLetStatement(t *testing.T) {
 
 	tests := []struct {
@@ -704,4 +725,42 @@ func testLetStatement(t *testing.T, s ast.Statement, name string) bool{
 		return false
 	}
 	return true
+}
+
+func TestStringLiteralExpression(t *testing.T) {
+	input := `"hello world"`
+	lexer := lexer.New(input)
+	parser := MakeNewParser(lexer)
+	program := parser.ParseProgram()
+	checkParserErrors(t, parser)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	literal, ok := stmt.Expression.(*ast.StringLiteral)
+	if !ok {
+		t.Fatalf("exp not *ast.StringLiteral. got=%T", stmt.Expression)
+	}
+	if literal.Value != "hello world" {
+		t.Errorf("literal.Value not %q. got=%q", "hello world", literal.Value)
+	}
+}
+
+func TestParsingIndexExpression(t *testing.T) {
+	input := "myArray[1 + 1]"
+	lexer := lexer.New(input)
+	parser := MakeNewParser(lexer)
+	program := parser.ParseProgram()
+	checkParserErrors(t, parser)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	index, ok := stmt.Expression.(*ast.IndexExpression)
+
+	if !ok {
+		t.Fatalf("exp not *ast.IndexExpression. got=%T", stmt.Expression)
+	}
+	if !testIdentifier(t, index.Left, "myArray") {
+		return
+	}
+	if !testInfixExpression(t, index.Index, 1, "+", 1) {
+		return
+	}
 }

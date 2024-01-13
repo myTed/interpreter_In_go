@@ -24,26 +24,40 @@ func isError(obj object.Object) bool{
 }
 
 func applyFunction(ce *ast.CallExpression, env *object.Environment) object.Object{
-	function, ok := Eval(ce.Function, env).(*object.Function)
-	if isError(function) {
-		return function
-	}
-	if !ok {
+	
+	
+	function := Eval(ce.Function, env)
+
+	switch function.(type) {
+	case *object.Function:
+		f := function.(*object.Function)
+		newEnv := object.NewEnvironment(f.Env)
+		for idx, arg := range ce.Arguments {
+			val := Eval(arg, env)
+			if isError(val) {
+				return val
+			}
+			newEnv.Set(f.Parameters[idx].String(), val)
+		}
+		evaluated := Eval(f.Body, newEnv)
+		if returnValue, ok := evaluated.(*object.ReturnValue); ok {
+			return returnValue.Value
+		}
+		return evaluated
+	case *object.Builtin:
+		f := function.(*object.Builtin)
+		var args = []object.Object{}
+		for _, arg := range ce.Arguments {
+			val := Eval(arg, env)
+			if isError(val) {
+				return val
+			}
+			args = append(args , val)
+		}
+		return f.Fn(args...)
+	default:
 		return newError("not a function: %s", function.Type())
 	}
-	newEnv := object.NewEnvironment(function.Env)
-	for idx, arg := range ce.Arguments {
-		val := Eval(arg, env)
-		if isError(val) {
-			return val
-		}
-		newEnv.Set(function.Parameters[idx].String(), val)
-	}
-	evaluated := Eval(function.Body, newEnv)
-	if returnValue, ok := evaluated.(*object.ReturnValue); ok {
-		return returnValue.Value
-	}
-	return evaluated
 }
 
 func Eval(node ast.Node, env *object.Environment) object.Object{
@@ -69,6 +83,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object{
 		return nativeBooleanObject(node.Value) 
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
+	case *ast.StringLiteral:
+		return &object.String{Value: node.Value}
 	case *ast.PrefixExpression:
 		right := Eval(node.Right, env)
 		if isError(right) {
@@ -98,10 +114,13 @@ func Eval(node ast.Node, env *object.Environment) object.Object{
 
 func evalIdentifier(ident *ast.Identifier, env *object.Environment) object.Object{
 	val, ok := env.Get(ident.Value)
-	if !ok {
-		return newError("identifier not found: %s", ident.Value)
+	if ok {
+		return val
 	}
-	return val
+	if builtin, ok := Builtins[ident.Value]; ok {
+		return builtin
+	}
+	return newError("identifier not found: %s", ident.Value)
 }
 
 func evalReturnExpression(node ast.Node, env *object.Environment) object.Object{
@@ -144,6 +163,9 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 	case left.Type() == object.INTEGER_OBJ &&
 			 right.Type() == object.INTEGER_OBJ:
 			 return evalIntegerInfixExpression(operator, left, right)
+	case left.Type() == object.STRING_OBJ &&
+			right.Type() == object.STRING_OBJ:
+			 return evalStringInfixExpression(operator, left, right)
 	case operator == "==":
 		return nativeBooleanObject(left == right)
 	case operator == "!=":
@@ -154,6 +176,18 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(),
 		operator, right.Type())
+	}
+}
+
+func evalStringInfixExpression(operator string, left object.Object, right object.Object) object.Object {
+	leftString := left.(*object.String).Value
+	rightString := right.(*object.String).Value
+
+	switch operator {
+	case "+":
+		return &object.String{Value: leftString + rightString}
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 

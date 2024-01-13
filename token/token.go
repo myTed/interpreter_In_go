@@ -15,7 +15,8 @@ const (
 	//식별자 + 리터럴
 	IDENT = "IDENT"
 	INT = "INT"
-
+	STRING = "STRING"
+	
 	//연산자
 	ASSIGN = "="
 	PLUS = "+"
@@ -23,6 +24,8 @@ const (
 	BANG = "!"
 	ASTERISK = "*"
 	SLASH = "/"
+	LBRACKET = "["
+	RBRACKET = "]"
 
 	LT = "<"
 	GT = ">"

@@ -22,6 +22,7 @@ const (
 	PRODUCT
 	PREFIX
 	CALL
+	INDEX
 )
 
 var precedences = map[token.TokenType]int{
@@ -34,6 +35,7 @@ var precedences = map[token.TokenType]int{
 	token.SLASH:     PRODUCT,
 	token.ASTERISK:  PRODUCT,
 	token.LPAREN: 	 CALL,
+	token.LBRACKET:	 INDEX,
 }
 
 type Parser struct {
@@ -53,6 +55,7 @@ func MakeNewParser(lexer *lexer.Lexer) *Parser {
 	newParser.makePrefixFns = make(map[token.TokenType]makePrefixFn)
 	newParser.makePrefixFns[token.INT] = newParser.makeIntegerLiteral
 	newParser.makePrefixFns[token.IDENT] = newParser.makeIdentifier
+	newParser.makePrefixFns[token.STRING] = newParser.makeStringLiteral
 	newParser.makePrefixFns[token.MINUS] = newParser.makePrefix
 	newParser.makePrefixFns[token.BANG] = newParser.makePrefix
 	newParser.makePrefixFns[token.TRUE] = newParser.makeBoolean
@@ -60,6 +63,7 @@ func MakeNewParser(lexer *lexer.Lexer) *Parser {
 	newParser.makePrefixFns[token.LPAREN] = newParser.makeGroupExpression
 	newParser.makePrefixFns[token.IF] = newParser.makeIfExpression
 	newParser.makePrefixFns[token.FUNCTION] = newParser.makeFuncExpression
+	newParser.makePrefixFns[token.LBRACKET] = newParser.makeArrayLiteral
 	newParser.makeInfixFns = make(map[token.TokenType]makeInfixFn)
 	newParser.makeInfixFns[token.PLUS] = newParser.makeInfix
 	newParser.makeInfixFns[token.MINUS] = newParser.makeInfix
@@ -70,6 +74,7 @@ func MakeNewParser(lexer *lexer.Lexer) *Parser {
 	newParser.makeInfixFns[token.EQUAL] = newParser.makeInfix
 	newParser.makeInfixFns[token.NOT_EQUAL] = newParser.makeInfix
 	newParser.makeInfixFns[token.LPAREN] = newParser.makeCallExpression
+	newParser.makeInfixFns[token.LBRACKET] = newParser.makeIndexExpression
 	return newParser
 }
 
@@ -160,6 +165,31 @@ func (p *Parser) makeInfix(left ast.Expression) ast.Expression {
 	return ie
 }
 
+func (p *Parser) makeIndexExpression(left ast.Expression) ast.Expression {
+	indexExp := &ast.IndexExpression{
+		Token: p.curToken,
+		Left: left,
+	}
+	p.nextToken()
+	indexExp.Index = p.makeExpression(LOWEST)
+	return indexExp
+}
+
+
+func (p *Parser) makeArrayLiteral() ast.Expression {
+	array := &ast.ArrayLiteral{Token:p.curToken}
+	p.nextToken()
+	for p.curToken.Type != token.RBRACKET {
+		if p.curToken.Type == token.COMMA {
+			p.nextToken()
+		}
+		array.Elements = append(array.Elements, p.makeExpression(LOWEST))
+		p.nextToken()
+	}
+	return array
+}
+
+
 
 func (p *Parser) makeCallExpression(function ast.Expression) ast.Expression {
 	call := &ast.CallExpression{Token: p.curToken, Function: function}
@@ -236,6 +266,9 @@ func (p *Parser) makeIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 }
 
+func (p *Parser) makeStringLiteral() ast.Expression {
+	return &ast.StringLiteral{Token: p.curToken, Value:p.curToken.Literal}
+}
 
 func (p *Parser) makeBoolean() ast.Expression {
 	return &ast.BooleanExpression{Token: p.curToken, Value: p.curToken.Type == token.TRUE}
